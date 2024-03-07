@@ -1,29 +1,22 @@
 # server for shiny_plot_spatial_verif
-library("harpIO")
-library("tidyverse")
-library("dplyr")
-library("RSQLite")
-library("DT")
-library("DBI")
 options(shiny.maxRequestSize=20*1024^2)
 Sys.setenv(TZ='UTC')
 
 read_sql <- function(filepath,score=NULL){
     #TODO: this function might need a more appropriate name
-    sql_object <- harpIO:::dbopen(gsub("\\\\","/",filepath))
-    scores <- dbListTables(sql_object)
+    sqlite_con <- RSQLite::dbConnect(RSQLite::SQLite(), gsub("\\\\","/",filepath))
+    scores <- DBI::dbListTables(sqlite_con)
     if(is.null(score)) {score=scores[1]}
-    verif_data <- as.data.frame(harpIO:::dbquery(sql_object, paste("SELECT * FROM ",score))) #can choose first score as default
-    harpIO:::dbclose(sql_object)
+    verif_data <- dplyr::tbl(sqlite_con, score) %>% dplyr::collect(n=Inf)
+    RSQLite::dbDisconnect(sqlite_con)
+
     items <- list("verif_data" = verif_data, "scores" = scores)
     return(items) #returns a list of dataframe and list of scores
 }
 
 update_options <- function(input,scores,session) {
     #TODO: this function might need a more appropriate name
-    dates <- unique(lubridate::as_datetime(input$fcdate,
-                                           origin = lubridate::origin,
-                                           tz = "UTC"))
+    dates <-  harpCore::unixtime_to_dttm(unique(input$fcdate))
     models <- unique(input$model)
     params <- unique(input$prm)
     leadtimes <- unique(input$leadtime)/3600
@@ -48,7 +41,9 @@ server <- function(input, output, session) {
   ############################################################
   # LOAD DATA                                                #
   ############################################################
+  
   getData <- reactive({
+    req(input$filein)
     if(is.null(input$filein)) return(NULL)
     read_sql(input$filein$datapath)
   })
@@ -64,7 +59,7 @@ server <- function(input, output, session) {
     req(input$filein)
     verif_data <- getData()$verif_data
     scores <- getData()$scores
-    update_options(verif_data,scores,session)
+    update_options(verif_data,scores, session)
   })
     
   ############################################################
@@ -85,14 +80,14 @@ server <- function(input, output, session) {
 #    scales <- isolate(input$scale)         #TODO, coming with plotting options
     params <- isolate(input$param)
     
-    fcbdate <- fcdate_range[1]
-    fcedate <- fcdate_range[2]
+    fcbdate <- gsub("-", "", fcdate_range[1])
+    fcedate <- gsub("-", "", fcdate_range[2])
 
     verif_data <- read_sql(input$filein$datapath, score)$verif_data
     filter_by <- vars(
       model    %in% models, 
       leadtime %in% leadtimes,
-      as_date(fcdate) >= as_date(fcbdate) & as_date(fcdate) <= as_date(fcedate),
+      fcdate >= harpCore::as_dttm(fcbdate) & fcdate <= harpCore::as_dttm(fcedate),
 #      threshold   %in% thresholds,         #TODO, dependent on score 
 #      scale   %in% scales,                 #TODO, dependent on score 
       prm      %in% params,
@@ -101,7 +96,7 @@ server <- function(input, output, session) {
 
     harpVis:::plot_spatial_verif(verif_data, {{score}}, filter_by = filter_by)
 
-  },width = 1000, height = 600)
+  },width = 800, height = 600)
 
   output$table <- renderDataTable({
 
