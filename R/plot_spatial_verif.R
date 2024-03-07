@@ -70,11 +70,10 @@ plot_spatial_verif <- function(
 
   if (!is.object(verif_data) && is.character(verif_data)) {
     if (grepl(".sqlite", verif_data)) {
-      library(RSQLite)
       message(verif_data)
-      sql_object <- harpIO:::dbopen(verif_data)
-      verif_data <- as.data.frame(harpIO:::dbquery(sql_object, paste("SELECT * FROM ", score_name)))
-      harpIO:::dbclose(sql_object)
+      sqlite_con <- RSQLite::dbConnect(RSQLite::SQLite(), verif_data)
+      verif_data <- dplyr::tbl(sqlite_con, score_name) %>% dplyr::collect(n=Inf)
+      RSQLite::dbDisconnect(sqlite_con)
     }
   }
   ################
@@ -116,13 +115,9 @@ plot_spatial_verif <- function(
   } else {
     plot_data <- plot_data %>% dplyr::mutate(fcdates = plot_data$fcdate + plot_data$leadtime) # valid datetimes
 
-    plot_data$fcdate <- lubridate::as_datetime(plot_data$fcdate,
-                                               origin = lubridate::origin,
-                                               tz = "UTC")
+    plot_data$fcdate <- harpCore::unixtime_to_dttm(plot_data$fcdate)
+    plot_data$fcdates <- harpCore::unixtime_to_dttm(plot_data$fcdates)
 
-    plot_data$fcdates <- lubridate::as_datetime(plot_data$fcdates,
-                                               origin = lubridate::origin,
-                                               tz = "UTC")
     ## forecast dates
     fcbdate <- strftime(min(plot_data$fcdate, na.rm = TRUE), format = "%d-%m-%Y %H:%M")
     fcedate <- strftime(max(plot_data$fcdate, na.rm = TRUE), format = "%d-%m-%Y %H:%M")
@@ -130,7 +125,7 @@ plot_spatial_verif <- function(
     savebdate <- strftime(min(plot_data$fcdate, na.rm = TRUE), format = "%Y%m%d%H%M")
     saveedate <- strftime(max(plot_data$fcdate, na.rm = TRUE), format = "%Y%m%d%H%M")
 
-    valid_hours <- unique(lubridate::hour(plot_data$fcdate))
+    valid_hours <- as.numeric(unique(format(as.POSIXct(plot_data$fcdate),"%H")))
   }
 
   # leadtimes in the dataframe are usually in seconds,
@@ -161,9 +156,6 @@ plot_spatial_verif <- function(
     saveedate <- strftime(max(plot_data$fcdate, na.rm = TRUE), format = "%Y%m%d%H%M")
   }
 
-  if (is.element("leadtime", names(plot_data)) && length(unique(plot_data$leadtime)) > 1) {
-    message("Multiple leadtimes found: ", paste(unique(plot_data$leadtime), collapse = " "))
-  }
   if (is.element("model", names(plot_data)) && length(unique(plot_data$model)) > 1) {
     message("Multiple models found: ", paste(unique(plot_data$model), collapse = " "))
   }

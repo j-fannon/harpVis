@@ -34,13 +34,13 @@ plot_spatial_line <- function(
   message("Plotting score: ", score_name)
   ### grouping across all fcdates by leadtime, parameter and model
   plot_data <- plot_data %>%
-               group_by(model, prm, leadtime) %>%
-               summarise(score_name = mean(get(score_name), na.rm = TRUE))
+               dplyr::group_by(model, prm, leadtime) %>%
+               dplyr::summarise(score_name = mean(get(score_name), na.rm = TRUE))
 
   if (score_name %in% c("mse", "mae", "rmse", "stde")) {
        score_lab <- toupper(score_name)
   } else {
-       score_lab <- str_to_title(score_name)
+       score_lab <- totitle(score_name)
   }
 
   gg <- ggplot2::ggplot(plot_data, aes(x = leadtime,

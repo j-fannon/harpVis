@@ -50,15 +50,18 @@ plot_spatial_nact <- function(
                         "hss",
                         "sedi")
   }
-  if (colour_by == "scale" || colour_by == "auto") {
+  if (colour_by == "scale" || colour_by == "auto" || is.na(colour_by)) {
     colour_by   <- "scale"
     x_data      <- "threshold"
+    y_data      <- "scale"
   } else if (colour_by == "threshold") {
     x_data      <- "scale"
+    y_data      <- "threshold"
   } else {
-    message(paste("colour_by should either be 'scale' or 'threshold'"))
+    message(paste("colour_by should either be 'scale' or 'threshold'.. Reverting to defaults."))
     colour_by   <- "scale"
     x_data      <- "threshold"
+    y_data      <- "scale"
   }
 
   message("Plotting score: ", paste(nact_scores, collapse = ", "))
@@ -114,10 +117,10 @@ plot_spatial_nact <- function(
   ## N-number of scores (columns) from above
 
   #convert to long table for facet_wrap
-  plot_data <- plot_data %>%
-               gather("score",
-                      "value",
-                      c(paste(nact_scores)))
+  plot_data <- plot_data %>% 
+               tidyr::pivot_longer(dplyr::all_of(unlist(nact_scores)),
+                            names_to = "score",
+                            values_to = "value")
 
   plot_data$value <- replace(plot_data$value, is.na(plot_data$value), NA)       # NaN to NA
   plot_data$value <- replace(plot_data$value, is.infinite(plot_data$value), NA) # Inf to NA
@@ -126,8 +129,6 @@ plot_spatial_nact <- function(
         score_name <- switch(score_name,
             "hira_me"  = "HiRA Multi Event",
             "hira_td"  = "HiRA Threat Detection",
-            # "hira_pragm"   = "HiRA Pragmatic method",
-            # "hira_crss"    = "HiRA Conditional square root for RPS",
         )
   } else {
       score_name <- toupper(score_name)
@@ -135,15 +136,15 @@ plot_spatial_nact <- function(
 
   gg <- ggplot2::ggplot(plot_data, aes(x = get(x_data),
                                        y = value,
-                                       colour = as.character(get(colour_by)))) +
-        ggplot2::scale_x_continuous(breaks = unique(plot_data$threshold)) +
+                                       colour = forcats::fct_inorder(as.character(get(colour_by))))) +
+        ggplot2::scale_x_continuous(breaks = unique(plot_data[[x_data]])) +
         ggplot2::geom_line(size = line_width) +
         ggplot2::geom_point(size = point_size) +
         ggplot2::labs(title = paste("Scores from", score_name,
                                     ", Param: ", unique(plot_data$prm)),
                       y = y_label,
-                      x = x_label,
-                      colour = str_to_title(colour_by)) +
+                      x = totitle(x_data),
+                      colour = totitle(y_data)) +
         facet_wrap(. ~ score,
                    ncol = num_facet_cols,
                    labeller = labeller(score = toupper))
@@ -152,8 +153,8 @@ plot_spatial_nact <- function(
 
   if (extend_y_to_zero) {gg <- gg + ggplot2::ylim(-0.025, NA)}
   if (flip_axes) {gg <- gg + ggplot2::coord_flip()}
-  if (y_label == "auto") {gg <- gg + ggplot2::labs(y = str_to_title("Score"))}
-  if (x_label == "auto") {gg <- gg + ggplot2::labs(x = str_to_title(x_data))}
+  if (y_label == "auto") {gg <- gg + ggplot2::labs(y = totitle("Score"))}
+  if (x_label == "auto") {gg <- gg + ggplot2::labs(x = totitle(x_data))}
 
   gg
 }

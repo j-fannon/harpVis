@@ -40,7 +40,7 @@ plot_spatial_fss <- function(
     y_data      <- "fss"
     plot_type   <- "line"
   } else {
-    message(paste("colour_by should either be 'scale' or 'threshold'"))
+    message(paste("colour_by should either be 'scale' or 'threshold'.. Reverting to defaults."))
     colour_by   <- "fss"
     x_data      <- "threshold"
     y_data      <- "scale"
@@ -70,18 +70,18 @@ plot_spatial_fss <- function(
   if (plot_type == "line") {
         gg <- ggplot2::ggplot(plot_data, aes(x = get(x_data),
                                              y = get(y_data),
-                                             colour = as.character(get(colour_by)))) +
+                                             colour = forcats::fct_inorder(as.character(get(colour_by))))) +
               ggplot2::geom_line(size = line_width) +
               ggplot2::scale_x_continuous(breaks = unique(plot_data[[x_data]])) +
               ggplot2::geom_point(size = point_size) +
-              ggplot2::labs(colour = stringr::str_to_title(colour_by))
+              ggplot2::labs(colour = totitle(colour_by))
   }
 
   gg <- gg + ggplot2::labs(title = paste("Score: ", score_name,
                                        ", Model: ", unique(plot_data$model),
                                        ", Param: ", unique(plot_data$prm)),
-                           x = stringr::str_to_title(x_data),
-                           y = stringr::str_to_title(y_data))
+                           x = totitle(x_data),
+                           y = totitle(y_data))
 
   ## Other settings
 

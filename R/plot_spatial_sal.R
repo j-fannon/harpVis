@@ -53,13 +53,13 @@ plot_spatial_sal <- function(
   ### since it does not work well with a large majority of zero values
   ### when there are neither observed or forecasted precipitation
 
-  S_percs <- quantile(plot_data$S, probs = quantiles, na.rm = TRUE)
-  A_percs <- quantile(plot_data$A, probs = quantiles, na.rm = TRUE)
-  #L_percs <- quantile(plot_data$L, probs = quantiles, na.rm = TRUE)
+  S_percs <- stats::quantile(plot_data$S, probs = quantiles, na.rm = TRUE)
+  A_percs <- stats::quantile(plot_data$A, probs = quantiles, na.rm = TRUE)
+  #L_percs <- stats::quantile(plot_data$L, probs = quantiles, na.rm = TRUE)
 
-  medianS <- median(plot_data$S, na.rm = TRUE)
-  medianA <- median(plot_data$A, na.rm = TRUE)
-  medianL <- median(plot_data$L, na.rm = TRUE)
+  medianS <- stats::median(plot_data$S, na.rm = TRUE)
+  medianA <- stats::median(plot_data$A, na.rm = TRUE)
+  medianL <- stats::median(plot_data$L, na.rm = TRUE)
 
   meanS <- mean(plot_data$S, na.rm = TRUE)
   meanA <- mean(plot_data$A, na.rm = TRUE)
@@ -108,7 +108,7 @@ plot_spatial_sal <- function(
                                        guide = guide_legend(override.aes = list(color = c("grey80")))) +
         ggplot2::scale_fill_manual("",
                                    values = "grey80",
-                                   guide = guide_legend(override.aes = list(alpha = 0.3))) +
+                                   guide = guide_legend(override.aes = list(alpha = 0.2))) +
         ggplot2::xlim(-xylim, xylim) +
         ggplot2::ylim(-xylim, xylim) +
         ggplot2::labs(y = "A",
@@ -119,12 +119,11 @@ plot_spatial_sal <- function(
                                   ", Param: ", unique(plot_data$prm))) +
         coord_cartesian(clip = "off")
         if (show_stats) {
-            library(gridExtra)
             gg <- gg +
-            ggplot2::annotation_custom(tableGrob(mytable,
+            ggplot2::annotation_custom(gridExtra::tableGrob(mytable,
                                                  rows = NULL,
                                                  cols = NULL,
-                                                 theme = ttheme_default(base_size = 7)),
+                                                 theme = gridExtra::ttheme_default(base_size = 7)),
                                        xmin = xylim * 1.725,
                                        xmax = xylim,
                                        ymin = -xylim * 1.06,
