@@ -8,6 +8,7 @@ options_barUI <- function(id) {
 
   app_start_dir <- shiny::getShinyOption("app_start_dir", default = NULL)
   full_nav      <- shiny::getShinyOption("full_dir_navigation", default = TRUE)
+  dsp           <- shiny::getShinyOption("dsp", default = "dir_select_populate")
 
   if (is.null(app_start_dir)) {
     full_nav <- TRUE
@@ -31,7 +32,10 @@ options_barUI <- function(id) {
               shiny::selectInput(
                 ns("data_dir"),
                 "Select Verification Directory",
-                dir_select_populate(app_start_dir, app_start_dir),
+                #dir_select_populate(app_start_dir, app_start_dir),
+                do.call(get(dsp),
+                        list(top_dir = app_start_dir,
+                             dir     = app_start_dir)),
                 width = "100%"
               )
             }
@@ -149,7 +153,9 @@ options_bar <- function(input, output, session) {
 
   app_start_dir <- shiny::getShinyOption("app_start_dir", default = NULL)
   full_nav      <- shiny::getShinyOption("full_dir_navigation", default = TRUE)
-
+  remote_read   <- shiny::getShinyOption("remote_read", default = FALSE)
+  remote_type   <- shiny::getShinyOption("remote_type", default = "gdrive")
+  
   if (full_nav) {
     volumes <- c(Home = fs::path_home(), harp_getVolumes()())
     if (!is.null(app_start_dir)) {
@@ -171,15 +177,17 @@ options_bar <- function(input, output, session) {
     if (full_nav) {
       data_dir(shinyFiles::parseDirPath(volumes, input$data_dir))
     } else {
-      poss_dirs <- dir_select_populate(app_start_dir, input$data_dir)
-      poss_choices <- names(poss_dirs)
-      if (length(poss_choices[poss_choices != "Back One Directory"]) > 1) {
-        shiny::updateSelectInput(
-          session,
-          "data_dir",
-          choices = poss_dirs,
-          selected = poss_choices[poss_choices != "Back One Directory"][1]
-        )
+      if (!remote_read) { # Sub-directories not considered for remote access yet
+        poss_dirs <- dir_select_populate(app_start_dir, input$data_dir)
+        poss_choices <- names(poss_dirs)
+        if (length(poss_choices[poss_choices != "Back One Directory"]) > 1) {
+          shiny::updateSelectInput(
+            session,
+            "data_dir",
+            choices = poss_dirs,
+            selected = poss_choices[poss_choices != "Back One Directory"][1]
+          )
+        }
       }
       data_dir(input$data_dir)
     }
@@ -195,9 +203,17 @@ options_bar <- function(input, output, session) {
   shiny::observeEvent(list(data_dir()), {
     shiny::req(data_dir())
     if (length(data_dir()) < 1) return()
-    data_files$filenames  <- dir(
-      data_dir(), pattern = "harpPointVerif*[[:graph:]]*.rds"
-    )
+    if (remote_read) {
+      if (remote_type == "gdrive"){
+        gfiles <- googledrive::drive_ls(path = file.path(app_start_dir,data_dir()),
+                                        pattern = "harpPointVerif*[[:graph:]]*.rds" )
+        data_files$filenames <- gfiles$name
+      }
+    } else {
+      data_files$filenames  <- dir(
+        data_dir(), pattern = "harpPointVerif*[[:graph:]]*.rds"
+      )
+    }
     harp_files        <- strsplit(data_files$filenames, ".harp.")
     data_files$models <- gsub(
       ".model.", " + ", unique(unlist(lapply(harp_files, `[`, 4)))
@@ -308,6 +324,25 @@ options_bar <- function(input, output, session) {
       type = "button", class = "btn btn-danger", `data-dismiss` = "modal",
       shiny:::validateIcon(NULL), "Dismiss"
     )
+    if (remote_read) {
+      shiny::showModal(
+        shiny::modalDialog("Dowloading data...",
+                           footer = modal_footer))
+      if (remote_type == "gdrive") {
+       
+        dfile_name <- file.path(getwd(),
+                                paste0(format(Sys.time(),"%Y_%m_%d_%H_%M_%S"),
+                                "_",
+                                basename(verif_file())))
+        suppressMessages(drive_download(
+          file.path(app_start_dir,verif_file()),
+          path = dfile_name,
+          overwrite = TRUE))
+        verif_file(dfile_name)
+        
+      }
+      shiny::removeModal()
+    }
     if (is.null(verif_file()) || length(verif_file()) < 1 || !file.exists(verif_file())) {
       shiny::showModal(
         shiny::modalDialog(
@@ -317,6 +352,9 @@ options_bar <- function(input, output, session) {
       )
     } else {
       verif_data(try(readRDS(verif_file()), silent = TRUE))
+      if (remote_read) {
+        fr <- suppressWarnings(file.remove(dfile_name))
+      }
       if (inherits(verif_data(), "try-error")) {
         shiny::showModal(
           shiny::modalDialog(
@@ -412,4 +450,27 @@ remove_double_dots <- function(x) {
     x <- Reduce(file.path, x[1:(length(x) - 2)])
   }
   x
+}
+
+gdrive_dir_select_populate <- function(top_dir, dir) {
+  
+  all_dirs <- tryCatch(
+    {
+      sort(googledrive::drive_ls(path = top_dir)$name)
+    },
+    error = function(cond){
+      NULL
+    }
+  )
+  valid_dirs <- c()
+  for (cur_dir in all_dirs) {
+    cfiles <- googledrive::drive_ls(path = file.path(top_dir,cur_dir),
+                                    pattern = "harpPointVerif*[[:graph:]]*.rds")
+    if (nrow(cfiles) > 0) {
+      valid_dirs <- c(valid_dirs,cur_dir)
+    }
+  }
+  names(valid_dirs) <- valid_dirs
+  valid_dirs
+  
 }
