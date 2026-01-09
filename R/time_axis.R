@@ -20,6 +20,7 @@ time_axis <- function(input, output, session, verif_data) {
   time_axis_name <- shiny::reactiveVal(NULL)
   is_profile     <- shiny::reactiveVal(NULL)
   out_data       <- shiny::reactiveVal(NULL)
+  time_cols      <- shiny::reactiveVal(NULL)
 
   possible_time_axes <- c(
     "lead_time", "leadtime",
@@ -42,6 +43,7 @@ time_axis <- function(input, output, session, verif_data) {
       "Date-Time",
       totitle(gsub("_", " ", time_col_names))
     )
+    time_cols(time_col_names)
 
     is_profile_data <- FALSE
     group_cols <- attr(verif_data(), "group_cols")
@@ -117,7 +119,9 @@ time_axis <- function(input, output, session, verif_data) {
       data_times    <- Reduce(
         union, lapply(verif_data(), function(x) x[[time_col]])
       )
-      data_times <- parse_times(data_times, time_col)
+      data_times <- parse_times(data_times, time_col,
+                                all_time_vars = time_col_names,
+                                vd = verif_data())
       if (is.null(selected_time) || !is.element(selected_time, data_times)) {
         selected_time <- data_times[1]
       }
@@ -142,7 +146,7 @@ time_axis <- function(input, output, session, verif_data) {
     time_axis_name(input[["time_axis"]])
   })
 
-  shiny::observeEvent(list(time_axis_name(), verif_data(), is_profile()), {
+  shiny::observeEvent(list(time_axis_name(), verif_data(), is_profile(), input[["profile_time_select"]]), {
 
     shiny::req(verif_data())
     shiny::req(time_axis_name())
@@ -151,7 +155,9 @@ time_axis <- function(input, output, session, verif_data) {
       data_times    <- Reduce(
         union, lapply(verif_data(), function(x) x[[time_axis_name()]])
       )
-      data_times <- parse_times(data_times, time_axis_name())
+      data_times <- parse_times(data_times, time_axis_name(),
+                                all_time_vars = time_cols(),
+                                vd = verif_data())
       if (is.null(selected_time) || !is.element(selected_time, data_times)) {
         selected_time <- data_times[1]
       }
@@ -208,11 +214,31 @@ time_axis <- function(input, output, session, verif_data) {
   ))
 }
 
-parse_times <- function(times_in, time_var) {
+parse_times <- function(times_in, time_var, all_time_vars = NULL, vd = list()) {
   has_all <- FALSE
-  all_el  <- grep("^All$|;", times_in)
-  if (length(all_el) > 0) {
-    has_all <- TRUE
+  # If there are multiple possible time vars, then to plot "All|;" for a given
+  # time_var you need to have "All|;" existing across each time_var
+  if ((!is.null(all_time_vars)) && (length(vd) > 0)) {
+    tdf <- NULL
+    for (ctv in all_time_vars) {
+      data_times    <- Reduce(
+        union, lapply(vd, function(x) x[[ctv]])
+      )
+      all_el  <- grep("^All$|;", data_times)
+      if (is.null(tdf)) {
+        tdf <- all_el
+      } else {
+        tdf <- intersect(tdf,all_el)
+      }
+    }
+    if (length(tdf) > 0) {
+      has_all <- TRUE
+    }
+  } else {
+    all_el  <- grep("^All$|;", times_in)
+    if (length(all_el) > 0) {
+      has_all <- TRUE
+    }
   }
   times <- times_in[times_in != "All"]
   if (grepl("dttm|validdate|fcdate", time_var)) {
