@@ -210,7 +210,7 @@ time_axis <- function(input, output, session, verif_data) {
   })
 
   shiny::observeEvent(list(
-    input[["profile_time_select"]], is_profile(), verif_data()
+    input[["profile_time_select"]], time_axis_name(), verif_data()
   ), {
 
     shiny::req(is_profile())
