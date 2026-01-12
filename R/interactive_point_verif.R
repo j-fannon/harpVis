@@ -1419,12 +1419,27 @@ get_times <- function(df, time_var) {
 
 # Function to see if "All" should be included in lead time selection
 all_cols_all <- function(.verif_data, el) {
-  group_cols <- grep(
-    "threshold",
-    Reduce(union, attr(.verif_data, "group_vars")),
-    inv = TRUE,
-    value = TRUE
-  )
+  # Is group_vars a list of lists?
+  nested_lists <- (sum(vapply(attr(.verif_data,"group_vars"),is.list,logical(1))) == length(attr(.verif_data,"group_vars")))
+  if (nested_lists) {
+    group_cols <- c()
+    for (ii in seq(1,length(attr(.verif_data,"group_vars")))) {
+      group_tmp <- grep(
+        "threshold",
+        Reduce(union, attr(.verif_data, "group_vars")[[ii]]),
+        inv = TRUE,
+        value = TRUE
+      )
+      group_cols <- unique(c(group_cols,group_tmp))
+    }
+  } else {
+    group_cols <- grep(
+      "threshold",
+      Reduce(union, attr(.verif_data, "group_vars")),
+      inv = TRUE,
+      value = TRUE
+    )
+  }
   nrow(
     dplyr::filter(
       .verif_data[[el]],
