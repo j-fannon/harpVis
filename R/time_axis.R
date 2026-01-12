@@ -21,6 +21,7 @@ time_axis <- function(input, output, session, verif_data) {
   is_profile     <- shiny::reactiveVal(NULL)
   out_data       <- shiny::reactiveVal(NULL)
   time_cols      <- shiny::reactiveVal(NULL)
+  profile_time   <- shiny::reactiveVal(NULL)
 
   possible_time_axes <- c(
     "lead_time", "leadtime",
@@ -68,8 +69,19 @@ time_axis <- function(input, output, session, verif_data) {
           union, lapply(verif_data(), function(x) x[[time_col_names]])
         )
         data_times <- parse_times(data_times, time_col_names)
+        reset_selec <- FALSE
         if (is.null(selected_time) || !is.element(selected_time, data_times)) {
+          reset_selec <- TRUE
           selected_time <- data_times[1]
+        }
+        if (is.null(profile_time())) {
+          profile_time(selected_time)
+        } else {
+          if ((is.element(profile_time(),data_times)) & (reset_selec)) {
+            selected_time <- profile_time()
+          } else {
+            profile_time(selected_time)
+          }
         }
         shiny::insertUI(
           selector = paste0("#", ns("time-axis-div-sel")),
@@ -122,8 +134,19 @@ time_axis <- function(input, output, session, verif_data) {
       data_times <- parse_times(data_times, time_col,
                                 all_time_vars = time_col_names,
                                 vd = verif_data())
+      reset_selec <- FALSE
       if (is.null(selected_time) || !is.element(selected_time, data_times)) {
+        reset_selec <- TRUE
         selected_time <- data_times[1]
+      }
+      if (is.null(profile_time())) {
+        profile_time(selected_time)
+      } else {
+        if ((is.element(profile_time(),data_times)) & (reset_selec)) {
+          selected_time <- profile_time()
+        } else {
+          profile_time(selected_time)
+        }
       }
       shiny::insertUI(
         selector = paste0("#", ns("time-axis-div")),
@@ -146,7 +169,7 @@ time_axis <- function(input, output, session, verif_data) {
     time_axis_name(input[["time_axis"]])
   })
 
-  shiny::observeEvent(list(time_axis_name(), verif_data(), is_profile(), input[["profile_time_select"]]), {
+  shiny::observeEvent(list(time_axis_name(), verif_data(), input[["profile_time_select"]]), {
 
     shiny::req(verif_data())
     shiny::req(time_axis_name())
@@ -158,8 +181,19 @@ time_axis <- function(input, output, session, verif_data) {
       data_times <- parse_times(data_times, time_axis_name(),
                                 all_time_vars = time_cols(),
                                 vd = verif_data())
+      reset_selec <- FALSE
       if (is.null(selected_time) || !is.element(selected_time, data_times)) {
+        reset_selec <- TRUE
         selected_time <- data_times[1]
+      }
+      if (is.null(profile_time())) {
+        profile_time(selected_time)
+      } else {
+        if ((is.element(profile_time(),data_times)) & (reset_selec)) {
+          selected_time <- profile_time()
+        } else {
+          profile_time(selected_time)
+        }
       }
       shiny::updateSelectInput(
         session,
