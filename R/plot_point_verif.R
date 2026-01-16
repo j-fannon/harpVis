@@ -323,7 +323,7 @@ plot_point_verif <- function(
       "spread_skill", "spread_skill_ratio", "spread_skill_with_dropped",
       "spread_skill_dropped_only", "spread_skill_ratio_with_dropped",
       "spread_skill_ratio_dropped_only", "normalized_rank_histogram",
-      "spread_stde", "spread_stde_ratio"
+      "spread_stde", "spread_stde_ratio", "uui_spread_skill"
     )
     derived_thresh_scores  <- c("brier_score_decomposition", "sharpness")
   } else {
@@ -397,6 +397,9 @@ plot_point_verif <- function(
     cli::cli_warn("No data to plot after filtering.")
     return()
   }
+
+  # Should be the correct number of stations after filtering!
+  num_stations <- suppressWarnings(max(plot_data[["num_stations"]]))
 
   plot_geom <- "line"
 
@@ -520,6 +523,16 @@ plot_point_verif <- function(
       linetype_by_name <- rlang::quo_name(linetype_by_quo)
       linetyping       <- TRUE
       sore_name        <- "spread ; skill"
+    },
+
+    "uui_spread_skill" = {
+      plot_data        <- tidyr::gather(plot_data, .data$uui_skill, .data$uui_spread, key = "component", value = "UUI spread ; skill")
+      y_axis_name      <- "UUI spread ; skill"
+      y_axis_quo       <- rlang::sym(y_axis_name)
+      linetype_by_quo  <- rlang::quo(component)
+      linetype_by_name <- rlang::quo_name(linetype_by_quo)
+      linetyping       <- TRUE
+      score_name       <- "UUI spread ; skill"
     },
 
     "spread_skill_ratio" = {
@@ -855,8 +868,8 @@ plot_point_verif <- function(
   )
   plot_subtitle <- switch(tolower(plot_subtitle),
     "auto" = {
-      if (is.element("num_stations", colnames(plot_data))) {
-        paste(max(plot_data[["num_stations"]]), "stations")
+      if (is.finite(num_stations)) {
+        paste(num_stations, "stations")
       } else {
         attrs[["num_stations"]]
       }
@@ -945,12 +958,14 @@ plot_point_verif <- function(
   gg <- gg + ggplot2::ylab(y_label)
   gg <- gg + ggplot2::theme(legend.position = legend_position)
 
-  fill_guide <- ggplot2::guide_legend
+  fill_guide <- function(title) ggplot2::guide_legend(
+    title = title, nrow = num_legend_rows, byrow = TRUE
+  )
   if (score_name == "hexbin") {
-    fill_guide <- ggplot2::guide_colourbar
+    fill_guide <- function(title) ggplot2::guide_colourbar(title = title)
   }
   gg <- gg + ggplot2::guides(
-    fill     = fill_guide(title = NULL, nrow = num_legend_rows, byrow = TRUE),
+    fill     = fill_guide(title = NULL),
     colour   = ggplot2::guide_legend(title = NULL, nrow = num_legend_rows, byrow = TRUE),
     shape    = ggplot2::guide_legend(title = NULL, nrow = num_legend_rows, byrow = TRUE),
     linetype = ggplot2::guide_legend(title = NULL)
@@ -1093,16 +1108,16 @@ plot_point_verif <- function(
               !!linetype_by_quo, !!colour_by_quo
             )
           ),
-          size = line_width
+          linewidth = line_width
         )
       } else {
         gg <- gg + ggplot2::geom_line(
           ggplot2::aes(lty = !! linetype_by_quo),
-          size = line_width
+          linewidth = line_width
         )
       }
     } else {
-      gg <- gg + ggplot2::geom_line(size = line_width)
+      gg <- gg + ggplot2::geom_line(linewidth = line_width)
     }
 
     if (point_size > 0) {
@@ -1124,7 +1139,7 @@ plot_point_verif <- function(
         aes(x = factor(!!x_axis_quo)), size = point_size, position = position_dodge(width = 1)) +
       ggplot2::geom_linerange(
         ggplot2::aes(x = factor(!!x_axis_quo), ymin = 0, ymax = !!y_axis_quo),
-        size      = line_width,
+        linewidth = line_width,
         position  = position_dodge(width = 1),
         key_glyph = "point"
       ) +
