@@ -1486,17 +1486,27 @@ all_cols_all <- function(.verif_data, el) {
 # Convert to plotly
 convert_to_plotly <- function(score_plot,title_str) {
   
-  gp <- plotly::ggplotly(score_plot) %>% 
-    plotly::layout(title = list(text = title_str),
-                   legend = list(orientation = "v"),
-                   margin = list(t=100,b=100))
-  
-  # Remove markers which may translate incorrectly
-  for (i in seq_along(gp$x$data)) {
-    if (gp$x$data[[i]]$mode == "markers") {
-      gp$x$data[[i]]$showlegend <- FALSE
-    }
+  if (typeof(score_plot) == "object") {
+    gp <- suppressWarnings(plotly::ggplotly(score_plot)) %>% 
+      plotly::layout(title = list(text = title_str),
+                     legend = list(orientation = "v"),
+                     margin = list(t=100,b=100))
+    
+    # Remove markers which may translate incorrectly
+    #for (i in seq_along(gp$x$data)) {
+    #  if (gp$x$data[[i]]$mode == "markers") {
+    #    gp$x$data[[i]]$showlegend <- FALSE
+    #  }
+    #}
+    # Remove extra legend entries (ending with ,digit in ())
+    gp$x$data <- lapply(gp$x$data, function(tr) {
+      if (!is.null(tr$name) && grepl(",[0-9])$", tr$name)) {
+        tr$showlegend <- FALSE
+      }
+      tr
+    })
+    gp
+  } else {
+    score_plot
   }
-  
-  gp
 }
