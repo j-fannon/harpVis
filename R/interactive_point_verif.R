@@ -4,6 +4,8 @@
 interactive_point_verifUI <- function(id) {
 
   ns <- shiny::NS(id)
+  use_plotly <- shiny::getShinyOption("use_plotly", default = FALSE)
+  
 
   shiny::fluidRow(
     shiny::column(2,
@@ -11,7 +13,11 @@ interactive_point_verifUI <- function(id) {
       shiny::tags$div(id = ns("placeholder"))
     ),
     shiny::column(8,
-      shiny::plotOutput(ns("plot"), height = "100%")
+      if (use_plotly) {
+        plotly::plotlyOutput(ns("plot"), height = "62.5vh")
+      } else {
+        shiny::plotOutput(ns("plot"), height = "100%")
+      }
     )
   )
 
@@ -69,6 +75,7 @@ interactive_point_verif <- function(
   ns <- session$ns
 
   theme_opt <- shiny::getShinyOption("theme", default = "white")
+  use_plotly <- shiny::getShinyOption("use_plotly", default = FALSE)
 
   plot_theme <- switch(
     theme_opt,
@@ -1098,8 +1105,12 @@ interactive_point_verif <- function(
   )
 
   # make the plot
-
-  output$plot <- shiny::renderPlot({
+  
+  score_plot <- shiny::eventReactive(
+    list(
+      score_options(),
+      verif_data()
+    ), {
     shiny::req(score_options())
     shiny::req(verif_data())
 
@@ -1114,7 +1125,8 @@ interactive_point_verif <- function(
     if (score_options()$flip_axes) {
       aspect_ratio <- 1.25
     }
-
+    plotly_title <- ""
+    
     if (score_options()$line_cols == "mname") {
 
       line_cols  <- rlang::sym(score_options()$line_cols)
@@ -1133,9 +1145,14 @@ interactive_point_verif <- function(
         colour_theme       = plot_theme,
         colour_table       = colour_table(),
         num_cases_position = score_options()$n_cases_pos,
-        flip_axes          = score_options()$flip_axes
-      ) +
-        ggplot2::theme(aspect.ratio = aspect_ratio)
+        flip_axes          = score_options()$flip_axes,
+        use_plotly         = use_plotly 
+      )
+      if (use_plotly) {
+        plotly_title <- score_plot$title
+        score_plot   <- score_plot$p
+      }
+      score_plot <- score_plot + ggplot2::theme(aspect.ratio = aspect_ratio)
 
     } else {
 
@@ -1189,9 +1206,14 @@ interactive_point_verif <- function(
         colour_table       = member_cols,
         group              = member,
         num_cases_position = score_options()$n_cases_pos,
-        flip_axes          = score_options()$flip_axes
-      ) +
-        ggplot2::theme(aspect.ratio = aspect_ratio)
+        flip_axes          = score_options()$flip_axes,
+        use_plotly         = use_plotly
+      )
+      if (use_plotly) {
+        plotly_title <- score_plot$title
+        score_plot   <- score_plot$p
+      }
+      score_plot <- score_plot + ggplot2::theme(aspect.ratio = aspect_ratio)
 
       all_highlights <- grep(
         "mbr[[:digit:]]+$",
@@ -1222,10 +1244,23 @@ interactive_point_verif <- function(
       }
 
     }
+    
+    list("score_plot"   = score_plot,
+         "plotly_title" = plotly_title)
 
-    score_plot
-
-  }, height = 550, bg = bg_colour, res = 96)
+  })
+  
+  if (use_plotly) {
+    output$plot <- plotly::renderPlotly({
+      convert_to_plotly(score_plot()$score_plot,
+                        score_plot()$plotly_title)
+    })
+  } else {
+    output$plot <- shiny::renderPlot({score_plot()$score_plot},
+                                     height = 550,
+                                     bg = bg_colour,
+                                     res = 96)
+  }
 
   return(score_options)
 
@@ -1446,4 +1481,22 @@ all_cols_all <- function(.verif_data, el) {
       dplyr::if_all(dplyr::all_of(group_cols), ~grepl("All|; ", .x))
     )
   ) > 0
+}
+
+# Convert to plotly
+convert_to_plotly <- function(score_plot,title_str) {
+  
+  gp <- plotly::ggplotly(score_plot) %>% 
+    plotly::layout(title = list(text = title_str),
+                   legend = list(orientation = "v"),
+                   margin = list(t=100,b=100))
+  
+  # Remove markers which may translate incorrectly
+  for (i in seq_along(gp$x$data)) {
+    if (gp$x$data[[i]]$mode == "markers") {
+      gp$x$data[[i]]$showlegend <- FALSE
+    }
+  }
+  
+  gp
 }

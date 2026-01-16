@@ -161,6 +161,7 @@ plot_point_verif <- function(
   base_family              = "",
   base_line_size           = base_size / 22,
   base_rect_size           = base_size / 22,
+  use_plotly               = FALSE,
   ...
 ) {
 
@@ -1040,6 +1041,9 @@ plot_point_verif <- function(
     names(colour_vec) <- colour_table[[colour_by_name]]
     if (plot_geom %in% c("line", "lollipop")) {
       gg                <- gg + ggplot2::scale_colour_manual(values = colour_vec)#table$colour)
+      if (point_size > 0) {
+        gg              <- gg + ggplot2::scale_fill_manual(values = colour_vec)
+      }
     } else {
       gg                <- gg + ggplot2::scale_fill_manual(values = colour_vec)#table$colour)
     }
@@ -1231,14 +1235,34 @@ plot_point_verif <- function(
     }
     grid::grid.draw(gt)
     class(gt) <- c("harp_num_cases_plot", class(gt))
-    gt
+    
+    if (use_plotly) {
+      out <- gg
+    } else {
+      out <- gt
+    }
 
   } else {
 
-    suppressWarnings(gg)
+    out <- suppressWarnings(gg)
 
   }
 
+  if (use_plotly) {
+    t_str <- "" 
+    if (nchar(gsub("[[:space:]]", "", plot_title)) > 0) {
+      t_str <- plot_title
+    }
+    if (nchar(gsub("[[:space:]]", "", plot_subtitle)) > 0) {
+      t_str <- paste0(t_str,'<br>',plot_subtitle)
+    }
+    if (nchar(gsub("[[:space:]]", "", plot_caption)) > 0) {
+      t_str <- paste0(t_str," :: ",plot_caption)
+    }
+    list(p = out,title = t_str)
+  } else {
+    out
+  }
 }
 
 # Function to convert to title case

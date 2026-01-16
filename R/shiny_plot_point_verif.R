@@ -22,6 +22,7 @@ shiny_plot_point_verif <- function(
   theme               = c("dark", "light", "white"),
   online              = TRUE,
   min_cases           = 1,
+  use_plotly          = FALSE,
   ...
 ) {
   if (!is.null(start_dir) && !dir.exists(start_dir)) {
@@ -32,7 +33,8 @@ shiny_plot_point_verif <- function(
   shiny::shinyOptions(
     app_start_dir = start_dir, online = online, theme = theme,
     full_dir_navigation = full_dir_navigation,
-    min_cases = min_cases
+    min_cases = min_cases,
+    use_plotly = use_plotly
   )
   shiny::runApp(app_dir, ...)
 }
